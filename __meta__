@@ -1,0 +1,10 @@
+{
+    "name": "Tablify",
+    "version": "1.0.0",
+    "author": "Sanjeev Krishna",
+    "uuid": "52bb73d3-635c-4ec1-8c02-ed0f2fd193c0",
+    "tags": [
+        "Migration",
+        "Terminal"
+    ]
+}
