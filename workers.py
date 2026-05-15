@@ -1,5 +1,8 @@
-import os
 import logging
+logger = logging.getLogger(__name__)
+
+import os
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
 from datetime import datetime
@@ -28,21 +31,21 @@ class OpenSession(QtCore.QThread):
         self._commands = []
         self._lock = QtCore.QMutex()
         self._running = True
-        logging.debug(f"OpenSession initialized for {self.name}")
+        logger.debug(f"OpenSession initialized for {self.name}")
 
     def run(self):
         """
         Starts the PTY session and handles command execution.
         """
         try:
-            logging.info(f"Connecting to {self.name}")
+            logger.info(f"Connecting to {self.name}")
             self.pty = GenericHandler(**self.kwargs)
             output = self.pty.clear_buffer()
             self.prompt = f"{self.pty.find_prompt()} "
             self.return_text.emit({'prompt': self.prompt, 'output': output})
-            logging.info(f"Connected to {self.name}")
+            logger.info(f"Connected to {self.name}")
         except Exception:
-            logging.error(f"Connection failed to {self.name}")
+            logger.error(f"Connection failed to {self.name}")
             self.session_failed.emit({'prompt': '', 'output': traceback.format_exc()})
             return
 
@@ -51,13 +54,13 @@ class OpenSession(QtCore.QThread):
             try:
                 if self._commands:
                     cmd = self._commands.pop(0)
-                    logging.debug(f"Executing command: {cmd}")
+                    logger.debug(f"Executing command: {cmd}")
                     try:
                         output = self.pty.send_command(cmd)
                         try:
                             parsed = AutoParseTextFSM(output, cmd, self.pty.device_type).parse()
                         except Exception as error:
-                            logging.warning(f"Parsing failed for command '{cmd}': {error}")
+                            logger.warning(f"Parsing failed for command '{cmd}': {error}")
                             parsed = str(error)
 
                         self.return_text.emit({
@@ -66,7 +69,7 @@ class OpenSession(QtCore.QThread):
                             'parsed': parsed
                         })
                     except Exception:
-                        logging.error(f"Command execution failed: {cmd}")
+                        logger.error(f"Command execution failed: {cmd}")
                         self.return_text.emit({
                             'prompt': '',
                             'output': f"[Command Error]\n{traceback.format_exc()}\n"
@@ -79,16 +82,19 @@ class OpenSession(QtCore.QThread):
         """
         Queues a command for execution.
         """
-        logging.debug(f"Command queued: {cmd}")
+        logger.debug(f"Command queued: {cmd}")
         self._lock.lock()
         self._commands.append(cmd)
         self._lock.unlock()
+
+        if hasattr(logger, 'savings'):
+            logger.savings(10)
 
     def stop(self):
         """
         Gracefully stops the session thread.
         """
-        logging.info(f"Stopping session thread for {self.name}")
+        logger.info(f"Stopping session thread for {self.name}")
         self._running = False
         self.wait()
 
@@ -97,10 +103,10 @@ class OpenSession(QtCore.QThread):
         Disconnects the session and releases resources.
         """
         try:
-            logging.info(f"Closing connection to {self.name}")
+            logger.info(f"Closing connection to {self.name}")
             self.pty.disconnect()
         except Exception:
-            logging.error(f"Closure failed for {self.name}")
+            logger.error(f"Closure failed for {self.name}")
             self.return_text.emit({
                 'prompt': '',
                 'output': f"[Command Error]\n{traceback.format_exc()}\n"

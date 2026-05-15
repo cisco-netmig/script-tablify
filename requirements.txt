@@ -1,3 +1,3 @@
 pyqt5
 futures
-netcore @ git+https://wwwin-github.cisco.com/sanjeekr/netcore.git
+netcore @ git+https://wwwin-github.cisco.com/Netmig/netcore.git

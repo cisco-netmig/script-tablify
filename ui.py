@@ -1,4 +1,6 @@
 import logging
+logger = logging.getLogger(__name__)
+
 import os
 import uuid
 from PyQt5 import QtWidgets, QtGui, QtCore
@@ -77,7 +79,7 @@ class Sessions(QtWidgets.QTabWidget):
         """
         Adds a new session tab with the given device name.
         """
-        logging.debug(f"Adding session for device: {name}")
+        logger.debug(f"Adding session for device: {name}")
         session_widget = Session(self, name, self.currentIndex() + 1)
         self.addTab(session_widget, name)
         self.setCurrentWidget(session_widget)
@@ -95,7 +97,7 @@ class Sessions(QtWidgets.QTabWidget):
         widget = self.widget(index)
         for session_id, info in list(self.data.items()):
             if info["widget"] == widget:
-                logging.debug(f"Closing session: {info['name']}")
+                logger.debug(f"Closing session: {info['name']}")
                 widget.close_session()
                 del self.data[session_id]
                 break
@@ -116,7 +118,7 @@ class Session(QtWidgets.QWidget):
         self.index = index
         self.session_id = str(uuid.uuid4())
 
-        logging.debug(f"Initializing session: {name}")
+        logger.debug(f"Initializing session: {name}")
 
         session_params = {
             'username': self.sessions.form.session['NETWORK_USERNAME'],
@@ -269,14 +271,14 @@ class Session(QtWidgets.QWidget):
         Handles execution of a command entered by the user.
         """
         if self.worker:
-            logging.debug(f"Executing command on {self.name}: {text}")
+            logger.debug(f"Executing command on {self.name}: {text}")
             self.worker.execute_command(text)
 
     def close_session(self):
         """
         Closes the current session connection.
         """
-        logging.info(f"Closing session: {self.name}")
+        logger.info(f"Closing session: {self.name}")
         self.worker.close()
 
     def add_card(self, data):
@@ -324,7 +326,7 @@ class Card(QtWidgets.QWidget):
     def __init__(self, session, data):
         super().__init__(session)
         self.data = data
-        logging.debug("Creating output card.")
+        logger.debug("Creating output card.")
 
         self.layout = QtWidgets.QVBoxLayout(self)
         self.layout.setContentsMargins(5, 5, 5, 5)
@@ -347,31 +349,28 @@ class Card(QtWidgets.QWidget):
             }}
         """)
 
-        self.add_text_edit()
+        self.add_label()
         self.add_table()
 
-    def add_text_edit(self):
+    def add_label(self):
         """
-        Adds a read-only text area showing the prompt and raw output.
+        Adds a read-only label showing the prompt and raw output.
         """
-        logging.debug("Adding text output area.")
-        self.text_edit = QtWidgets.QTextEdit()
-        self.text_edit.setReadOnly(True)
-        self.layout.addWidget(self.text_edit)
+        logger.debug("Adding label output area.")
+        self.label = QtWidgets.QLabel(self)
+        self.label.setTextFormat(QtCore.Qt.RichText)
+        self.label.setWordWrap(True)
+        self.label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse | QtCore.Qt.LinksAccessibleByMouse)
+        self.layout.addWidget(self.label)
 
-        cursor = self.text_edit.textCursor()
+        prompt = self.data.get('prompt', '')
+        output = self.data.get('output', '').lstrip().replace('\n', '<br>')
 
-        prompt_format = QtGui.QTextCharFormat()
-        prompt_format.setForeground(QtGui.QBrush(QtGui.QColor("#008000")))
-        prompt_format.setFontWeight(QtGui.QFont.Bold)
-        cursor.insertText(self.data.get('prompt', ''), prompt_format)
-
-        default_format = QtGui.QTextCharFormat()
-        cursor.insertText(self.data.get('output', '').strip(), default_format)
-
-        line_height = int(QtGui.QFontMetrics(self.text_edit.font()).height() * 1.1)
-        line_count = len(self.text_edit.toPlainText().splitlines())
-        self.text_edit.setFixedHeight((line_height * line_count) + 5)
+        html = (
+            f'<span style="color:green; font-weight:bold;">{prompt}</span>'
+            f'<span style="white-space:pre-wrap; font-weight:300;">{output}</span>'
+        )
+        self.label.setText(html)
 
     def add_table(self):
         """
@@ -379,7 +378,7 @@ class Card(QtWidgets.QWidget):
         """
         parsed_data = self.data.get('parsed')
         if isinstance(parsed_data, list) and parsed_data:
-            logging.debug("Parsed table data found. Adding table.")
+            logger.debug("Parsed table data found. Adding table.")
             headers = [header.replace("_", " ").title() for header in parsed_data[0].keys()]
             table = CopyableTable(self)
             table.setColumnCount(len(headers))
@@ -408,7 +407,7 @@ class Card(QtWidgets.QWidget):
             table.setFixedHeight(int((len(parsed_data) + 1) * 30.5))
             self.layout.addWidget(table)
         else:
-            logging.warning("Parsed data invalid or missing.")
+            logger.warning("Parsed data invalid or missing.")
             error_label = QtWidgets.QLabel(f"[TextFSM Error] {parsed_data}")
             error_label.setWordWrap(True)
             error_label.setStyleSheet('color: red;')
@@ -420,10 +419,10 @@ class CopyableTable(QtWidgets.QTableWidget):
     """
     QTableWidget that supports copying selected content to clipboard.
     """
-    
+
     def keyPressEvent(self, event):
         if event.matches(QtGui.QKeySequence.Copy):
-            logging.debug("Copy event detected. Copying selection.")
+            logger.debug("Copy event detected. Copying selection.")
             self.copy_selection_to_clipboard()
         else:
             super().keyPressEvent(event)
@@ -434,7 +433,7 @@ class CopyableTable(QtWidgets.QTableWidget):
         """
         selection = self.selectedRanges()
         if not selection:
-            logging.info("No selection to copy.")
+            logger.info("No selection to copy.")
             return
 
         copied_text = ""
@@ -455,7 +454,7 @@ class CopyableTable(QtWidgets.QTableWidget):
             copied_text += "\t".join(row_data) + "\n"
 
         QtWidgets.QApplication.clipboard().setText(copied_text)
-        logging.debug("Selection copied to clipboard.")
+        logger.debug("Selection copied to clipboard.")
 
 
 class CommandTextEdit(QtWidgets.QTextEdit):
@@ -479,7 +478,7 @@ class CommandTextEdit(QtWidgets.QTextEdit):
         """
         Sets the prompt text and resets the input field.
         """
-        logging.debug(f"Setting prompt: {prompt}")
+        logger.debug(f"Setting prompt: {prompt}")
         self.clear()
         self.prompt = prompt
 
@@ -504,7 +503,7 @@ class CommandTextEdit(QtWidgets.QTextEdit):
             full_text = self.toPlainText()
             user_input = full_text[len(self.prompt):].strip()
             if user_input:
-                logging.info(f"Command submitted: {user_input}")
+                logger.info(f"Command submitted: {user_input}")
                 self.return_pressed.emit(user_input)
         else:
             super().keyPressEvent(event)
